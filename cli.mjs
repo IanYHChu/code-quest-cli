@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-// Code Quest installer.  Usage:
-//   npx code-quest install     wire up status line + hooks + slash commands (idempotent)
-//   npx code-quest uninstall   cleanly remove everything (add --purge to also wipe your save)
-//   npx code-quest status      show what's installed
+// Code Quest installer.  Usage:  (the npm package is code-quest-cli; the bare name `code-quest`
+// is blocked by npm's similarity rule for everyone, so nobody else can claim it either)
+//   npx code-quest-cli install     wire up status line + hooks + slash commands (idempotent)
+//   npx code-quest-cli uninstall   cleanly remove everything (add --purge to also wipe your save)
+//   npx code-quest-cli status      show what's installed
 import {
   readFileSync, writeFileSync, mkdirSync, copyFileSync, rmSync, renameSync, existsSync, statSync,
 } from 'node:fs';

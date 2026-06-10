@@ -145,7 +145,7 @@ if (sarifMode) {
   });
   const driver = {
     name: 'code-quest-nudge',
-    informationUri: 'https://github.com/IanYHChu/code-quest',
+    informationUri: 'https://github.com/IanYHChu/code-quest-cli',
     // honesty travels with the data, not just the pretty report
     fullDescription: { text: 'Lightweight regex-heuristic commit scan from the Code Quest toy. '
       + 'Educational nudges, not verified findings: false positives are expected and no data-flow '

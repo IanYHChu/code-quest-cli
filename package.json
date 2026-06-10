@@ -1,5 +1,5 @@
 {
-  "name": "code-quest",
+  "name": "code-quest-cli",
   "version": "0.1.0",
   "description": "An ambient ASCII roguelike that lives in your Claude Code status line — your coding is the game.",
   "author": "Ian Chu (https://github.com/IanYHChu)",
@@ -16,10 +16,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/IanYHChu/code-quest.git"
+    "url": "git+https://github.com/IanYHChu/code-quest-cli.git"
   },
-  "bugs": "https://github.com/IanYHChu/code-quest/issues",
-  "homepage": "https://github.com/IanYHChu/code-quest#readme",
+  "bugs": "https://github.com/IanYHChu/code-quest-cli/issues",
+  "homepage": "https://github.com/IanYHChu/code-quest-cli#readme",
   "files": [
     "cli.mjs",
     "quest-data.mjs",

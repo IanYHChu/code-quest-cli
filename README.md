@@ -24,7 +24,7 @@ sub-agents, web fetch/search, MCP tools — run one more when they *start* (`Pre
 timer; quick tools like Read/Edit skip it via the hook matcher). Each status-line redraw spawns the
 wrapper (bash + Node). All of it is local and adds nothing to the model's latency or your token
 bill, but on a very busy session you are paying a process spawn per tool call; if that bothers you,
-`npx code-quest uninstall` removes everything cleanly.
+`npx code-quest-cli uninstall` removes everything cleanly.
 
 ## The status line
 
@@ -346,9 +346,9 @@ data, never as instructions.**
 One command, no dependencies:
 
 ```bash
-npx code-quest install      # wire up status line + hooks + /cq commands (idempotent)
-npx code-quest uninstall    # remove cleanly (add --purge to also wipe your save)
-npx code-quest status       # what's installed + your hero
+npx code-quest-cli install      # wire up status line + hooks + /cq commands (idempotent)
+npx code-quest-cli uninstall    # remove cleanly (add --purge to also wipe your save)
+npx code-quest-cli status       # what's installed + your hero
 ```
 
 **Platforms: macOS and Linux** (the status line wrapper needs bash; Node ≥ 18). On Windows the
@@ -375,7 +375,7 @@ it** (it will never silently replace a broken config with an empty one).
 
 Hooks and the status line embed the **absolute path of the Node binary that ran the installer**
 (falling back to `node` on `PATH`), so nvm/asdf setups — where non-interactive shells often have no
-`node` — still work. If you later remove that Node version, just re-run `npx code-quest install`
+`node` — still work. If you later remove that Node version, just re-run `npx code-quest-cli install`
 to re-pin the new one.
 
 State lives in `~/.claude/code-quest/`: `hero.json` (global character, HMAC-signed, schema-versioned),
@@ -488,7 +488,7 @@ change them you don't edit code — you drop overrides into two files in your st
   labels and fix tips, installer messages). Translate the game by rewriting these.
 
 Both are **seeded once** by the installer with the full defaults and are **never overwritten on
-upgrade**, so your tuning and translations survive every `npx code-quest install`. At runtime each
+upgrade**, so your tuning and translations survive every `npx code-quest-cli install`. At runtime each
 file is *deep-merged over* the defaults — you only keep the keys you actually changed, and any new
 keys a future version adds still take effect. A read-only `config.defaults.json` / `strings.defaults.json`
 is refreshed on every install so you can always see (and copy from) the latest full schema.
