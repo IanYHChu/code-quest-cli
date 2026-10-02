@@ -1,8 +1,8 @@
 // code-quest:noscan  (this module defines the smell patterns — don't let the scanner flag its own rules)
-// Code Quest - the smell RULESET, shared by the game hook (quest-hook.mjs) and the nudge
-// report (quest-nudge.mjs). One source of truth: the hook does a fast presence-based pass for
-// floor generation; the nudge re-uses the very same patterns for a line-attributed pass over
-// your commit diffs (scanDetail). Security rules carry a severity (0-9, CVSS-ish) + a MITRE CWE
+// Code Quest - the smell RULESET, shared by the game (hooks/game.ts, through quest-analyze.mjs)
+// and the nudge report (hooks/nudge.ts). One source of truth: the game does a fast presence-based
+// pass over the file Claude read to breed its monsters; the nudge re-uses the very same patterns
+// for a line-attributed pass over your commit diffs (scanDetail). Security rules carry a severity (0-9, CVSS-ish) + a MITRE CWE
 // id; quality rules carry a canonical ESLint/SonarQube/clippy/PMD rule id.
 import { CONFIG } from './quest-config.mjs';
 

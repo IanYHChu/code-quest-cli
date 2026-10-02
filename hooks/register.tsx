@@ -12,17 +12,22 @@
 // Claude's tool calls are the steps: a Read sets the code the next foes are bred from, every
 // second call a foe steps out, failing tests send a bug, a commit raises a boss. Fights resolve
 // on their own. The rules live in game.ts; this file wires them to Claude Code.
-// /cq-boss and /cq-bug raise foes by hand; /cq-pane opens the full sheet.
+// The run is kept in $.store as well, so it carries across sessions: a session picks it up as it
+// starts, and the last session to change it wins.
+// /cq opens the full sheet, /cq-nudge reviews your commits, /cq-reroll starts over.
 import { atom, read, update } from 'claude-code'
-import type { Register } from 'claude-code'
+import type { EngineInterface, Register } from 'claude-code'
 
-import type { Element, Game, Rarity, Slot } from '../types'
+import type { Element, Game, Rarity, Slot, Smell } from '../types'
 import { MONSTERS } from '../data/monsters'
-import { SLOTS, advance, choose, conclude, density, describe, discard, entries, fix, hasUpgrade, openMenu, perks, point, stats, wardList } from './game'
+import { STR } from '../quest-config.mjs'
+import { FRESH, SLOTS, advance, choose, conclude, density, describe, discard, entries, fix, hasUpgrade, openMenu, perks, point, stats, wardList } from './game'
 import type { Weather } from './game'
 import { compare } from './loot'
+import { nudge } from './nudge'
 
 const PANE = 'cq-pane'
+const STORE_KEY = 'game'
 const game = atom({ plugin: 'code-quest', key: 'game' } as const, fix(null))
 const FRAME_MS = 260
 const HOLD_FRAMES = 8
@@ -33,6 +38,52 @@ const RE_TEST = /\b(npm|pnpm|yarn|bun)\s+(run\s+)?test\b|\b(jest|vitest|pytest|c
 const RE_FAILED = /\bfail(s|ed|ing|ures?)?\b|\bnot ok\b/i
 
 const edit = (fn: (g: Game) => Game) => (raw: Game) => fn(fix(raw))
+
+// keep the run between sessions; a failed write costs only this change, so it is logged, not thrown
+async function persist($: EngineInterface, g: Game): Promise<void> {
+  try { await $.store.set(STORE_KEY, g) } catch (err) { $.ui.log(`code-quest: could not save the run: ${String(err)}`, { to: 'debug' }) }
+}
+// change the run and keep it
+async function change($: EngineInterface, fn: (g: Game) => Game): Promise<Game> {
+  const g = await update($, game, edit(fn))
+  await persist($, g)
+  return g
+}
+
+// the fix tip for each smell, from the same table the nudge report uses
+const SMELL_KEY: Record<Smell, string> = { swallow: 'swallow', leak: 'leaks', dead: 'dead', debug: 'debug', insecure: 'insecure', todo: 'todos' }
+const tipOf = (s: Smell) => STR.report.smells.find(r => r.key === SMELL_KEY[s])?.tip ?? ''
+
+const HELP = `Code Quest: a gear roguelike in the band above your prompt. Claude's work drives the run.
+
+THE BAND
+  left    three gear slots: 1 weapon, 2 armor, 3 skill. A yellow slot has an upgrade in the bag.
+  middle  the fight, blow by blow, or the latest event; or an open slot menu.
+  right   LP, ATK and DEF, and the element each slot grants (/weapon ]armor *skill).
+
+HOW THE RUN MOVES (on its own, zero tokens)
+  every second tool call   a foe steps out and fights you
+  Claude reads a file      its code smells breed the next foes; dirtier code, faster-growing foes
+  tests fail / pass        a bug attacks / a fountain heals 5 LP
+  git commit               a boss, the Commit Warden
+  a win                    drops an item into the bag (8 at most)
+
+GEAR
+  Press 1, 2 or 3 to open a slot's menu: q previous, a next, e equip, z drop. Press it again to close.
+  Items roll Diablo II style: normal, magic (blue), rare (yellow). A prefix gives an element;
+  suffixes resist, absorb or reflect damage of one element.
+  Elements: fire beats ice, ice beats arcane, arcane beats fire. A foe's element comes from its
+  smell: runtime trouble is fire, stale debt ice, security holes arcane.
+
+DEATH
+  The run ends at once; pick one item to carry into the next (e keeps it). There are no levels:
+  your power is your gear.
+
+COMMANDS
+  /cq          the full sheet: gear, wards, the smells breeding your foes and how to fix them
+  /cq-nudge    gentle pointers from your own recent commits: [count | commit | A..B] [--all] [--sarif]
+  /cq-reroll   start over at run 1 with nothing
+  /cq-help     this help`
 
 const RARITY_COLOR: Record<Rarity, string | undefined> = { normal: undefined, magic: 'blue', rare: 'yellow' }
 const ELEMENT_COLOR: Record<Element, string> = { fire: 'red', ice: 'cyan', arcane: 'magenta' }
@@ -58,42 +109,61 @@ export const register: Register = on => {
   let player: { cancel(): void } | undefined
 
   on('session.start', async ($, e, next) => {
-    // the fight player: one frame per beat, and nothing written while no fight plays
+    // a new session picks up the saved run; a hot reload keeps the one it holds
+    const held = await $.state.get({ plugin: 'code-quest', key: 'game' })
+    if (held.version === 0) {
+      const saved = fix(await $.store.get(STORE_KEY) as Partial<Game> | undefined)
+      await $.state.set({ plugin: 'code-quest', key: 'game' }, saved)
+    }
+    // the fight player: one frame per beat, and nothing written while no fight plays. Frames
+    // are not saved; the outcome is, once the fight ends
     player?.cancel()
     player = $.clock.every(FRAME_MS, () => {
       void (async () => {
         const g = fix(await read($, game))
         if (!g.fight) return
-        await update($, game, edit(s => {
+        const after = await update($, game, edit(s => {
           if (!s.fight) return s
           return s.fight.at + 1 >= s.fight.frames.length + HOLD_FRAMES ? conclude(s) : { ...s, fight: { ...s.fight, at: s.fight.at + 1 } }
         }))
+        // concluded: no fight now, or the next queued one just began
+        if (!after.fight || after.fight.at === 0) await persist($, after)
       })()
     })
-    await $.command.register({ name: 'cq-pane', description: 'Code Quest prototype: open the full character sheet' })
-    await $.command.register({ name: 'cq-bug', description: 'Code Quest prototype: a bug attacks (as if tests failed)' })
-    await $.command.register({ name: 'cq-boss', description: 'Code Quest prototype: a boss rises (as if you committed)' })
+    await $.command.register({ name: 'cq', description: 'Code Quest: open the full character sheet' })
+    await $.command.register({ name: 'cq-help', description: 'Code Quest: how to play' })
+    await $.command.register({ name: 'cq-nudge', description: 'Code Quest: gentle pointers from your own recent commits', argumentHint: '[count | commit | A..B] [--all] [--sarif]' })
+    await $.command.register({ name: 'cq-reroll', description: 'Code Quest: start over at run 1 with nothing' })
     return next(e)
   })
 
-  on('command.run', { command: 'cq-pane' }, async $ => {
+  on('command.run', { command: 'cq' }, async $ => {
     await $.ui.open({ id: PANE, title: 'Code Quest', closeOnEscape: true, columns: 48 })
     return { text: 'Code Quest sheet opened (Esc closes it).' }
   })
-  on('command.run', { command: 'cq-bug' }, async $ => {
-    await update($, game, edit(g => advance(g, { kind: 'tests', passed: false })))
-    return { text: 'A bug attacks in the band.' }
+  on('command.run', { command: 'cq-help' }, () => ({ text: HELP }))
+  on('command.run', { command: 'cq-nudge' }, async ($, e) => {
+    const git = (args: string[]) => $.process.run(['git', ...args], { timeoutMs: 8000 })
+    return { text: await nudge(git, e.args) }
   })
-  on('command.run', { command: 'cq-boss' }, async $ => {
-    await update($, game, edit(g => advance(g, { kind: 'commit' })))
-    return { text: 'A boss rises in the band.' }
+  on('command.run', { command: 'cq-reroll' }, async $ => {
+    const g = fix(await read($, game))
+    let answer = ''
+    try {
+      answer = await $.ui.ask(`Reroll Code Quest? Run ${g.run}, your gear and your bag are gone for good.`, ['Keep playing', 'Reroll'])
+    } catch {
+      // dismissed, or nobody to ask: keep the run
+    }
+    if (answer !== 'Reroll') return { text: 'Code Quest: reroll cancelled, the run goes on.' }
+    await change($, () => ({ ...FRESH }))
+    return { text: 'Code Quest: rerolled. Run 1 starts empty-handed.' }
   })
 
   on('tool.call', async ($, e, next) => {
     const ran = await next(e)
     if (ran.deny === undefined) {
       const w = weatherOf(e as unknown as { tool: string } & Record<string, unknown>, ran)
-      await update($, game, edit(g => advance(g, w)))
+      await change($, g => advance(g, w))
     }
     return ran
   })
@@ -154,9 +224,9 @@ export const register: Register = on => {
             {pick && <Button key="up" label="^" hotkey="q" plain dimColor={cursor === 0} onPress={step(-1)} />}
             {pick && <Button key="down" label="v" hotkey="a" plain dimColor={cursor >= list.length - 1} onPress={step(1)} />}
             {pick && <Button key="use" label={isKeep ? 'keep' : isWorn ? 'close' : 'equip'} hotkey="e" plain
-              onPress={() => update($, game, edit(s => choose(s, Math.min(s.menu?.cursor ?? 0, entries(s).length - 1))))} />}
+              onPress={() => change($, s => choose(s, Math.min(s.menu?.cursor ?? 0, entries(s).length - 1)))} />}
             {pick && !isKeep && <Button key="drop" label="drop" hotkey="z" plain dimColor={isWorn}
-              onPress={() => update($, game, edit(s => discard(s, s.menu?.cursor ?? 0)))} />}
+              onPress={() => change($, s => discard(s, s.menu?.cursor ?? 0))} />}
           </Box>
         </Box>
       )
@@ -206,8 +276,9 @@ export const register: Register = on => {
     const { Box, Text } = $.ui.resolve(e)
     const g = fix(await read($, game))
     const me = stats(g.gear)
+    // each smell, what it breeds, and how to clean it up (which tames its monster)
     const smells = MONSTERS.filter(m => g.profile.counts[m.smell] > 0)
-      .map(m => `  ${m.smell} x${g.profile.counts[m.smell]}  -> ${m.name} [${m.element}]`)
+      .flatMap(m => [`  ${m.smell} x${g.profile.counts[m.smell]}  -> ${m.name} [${m.element}]`, `      fix: ${tipOf(m.smell)}`])
     const rows = [
       `run ${g.run}   LP ${g.lp}/${me.maxlp}   ATK ${me.atk}   DEF ${me.def}   ${perks(me).join(' ')}`,
       ...SLOTS.map(s => describe(g.gear[s], s)),

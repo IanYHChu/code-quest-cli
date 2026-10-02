@@ -27,8 +27,9 @@ test('pressing a slot opens its menu in the middle; pressing it again closes it'
   await ui.unmount()
 })
 
-test('a bug from failing tests starts a fight in the middle zone', async $ => {
-  await $.command.run({ command: 'cq-bug', ...RUN })
+test('a bug from failing tests starts a fight in the middle zone', async ($, on) => {
+  on('tool.call', () => ({ result: { stdout: '1 failed' }, text: '1 failed' }) as never)
+  await $.tool.call({ tool: 'Bash', command: 'npm test' } as never)
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   expect(await ui.find({ type: 'Text', text: /^a bug from the failing tests .*from the entrance/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /^\d{3} \[[#.]{8}\] @ {14}m \[[#.]{8}\] \d{3}$/ })).toBeDefined()

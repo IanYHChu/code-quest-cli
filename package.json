@@ -1,18 +1,16 @@
 {
   "name": "code-quest-cli",
-  "version": "0.1.0",
-  "description": "An ambient ASCII roguelike that lives in your Claude Code status line — your coding is the game.",
+  "version": "0.2.0",
+  "description": "A gear-driven roguelike in the band above your Claude Code prompt: your code's smells breed the monsters, Claude's work drives the run. A Claude Code plugin.",
   "author": "Ian Chu (https://github.com/IanYHChu)",
   "type": "module",
   "bin": {
-    "code-quest": "cli.mjs"
+    "code-quest": "bin/code-quest.mjs"
   },
   "scripts": {
-    "test": "node --test test/*.test.mjs",
-    "prepublishOnly": "npm test"
-  },
-  "engines": {
-    "node": ">=18"
+    "test": "claude plugin test .",
+    "validate": "claude plugin validate .",
+    "prepublishOnly": "claude plugin validate . && claude plugin test ."
   },
   "repository": {
     "type": "git",
@@ -21,22 +19,22 @@
   "bugs": "https://github.com/IanYHChu/code-quest-cli/issues",
   "homepage": "https://github.com/IanYHChu/code-quest-cli#readme",
   "files": [
-    "cli.mjs",
-    "quest-config.mjs",
-    "quest-data.mjs",
-    "quest-rules.mjs",
+    ".claude-plugin/plugin.json",
+    "bin/",
+    "data/",
+    "hooks/",
+    "!hooks/*.test.ts",
+    "!hooks/*.test.tsx",
+    "types/",
     "quest-analyze.mjs",
-    "quest-state.mjs",
-    "quest-dungeon.mjs",
-    "quest-hook.mjs",
-    "quest-status.mjs",
-    "quest-report.mjs",
-    "quest-reroll.mjs",
-    "quest-nudge.mjs",
-    "legacy-commands/",
+    "quest-analyze.d.mts",
+    "quest-config.mjs",
+    "quest-config.d.mts",
+    "quest-rules.mjs",
+    "quest-rules.d.mts",
     "README.md",
     "LICENSE"
   ],
-  "keywords": ["claude-code", "statusline", "roguelike", "hook", "gamification"],
+  "keywords": ["claude-code", "claude-code-plugin", "roguelike", "gamification", "code-smells"],
   "license": "MIT"
 }

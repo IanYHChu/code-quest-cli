@@ -1,8 +1,8 @@
 // Code Quest - the code-smell scanner: a single pass plus a few regexes over the file you just
-// read, producing the next floor's profile. The ruleset itself (the pattern literals with their
+// read, producing its profile (the game breeds monsters from its counts). The ruleset itself (the pattern literals with their
 // CWE ids, severities, linter rule ids) lives in quest-rules.mjs; this module only wires those
 // patterns to counts, so unlike the catalog it carries no trigger strings of its own — it is
-// scanned like any other file. All balance numbers come from CONFIG (quest-data.mjs).
+// scanned like any other file. All its numbers come from CONFIG (quest-config.mjs).
 import { CONFIG } from './quest-config.mjs';
 import {
   SECRET_PATS, WEAKCRED_PATS, INSECURE_PATS, MISCONFIG_PATS, CONTAINER_PATS,

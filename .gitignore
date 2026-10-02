@@ -1,10 +1,4 @@
 node_modules/
-# legacy guard: PRE-RELEASE installers generated this wrapper in-repo (embedding machine-local
-# absolute paths). The current installer only ever writes it under ~/.claude/code-quest/bin/,
-# but the ignore stays so a stale copy from an old checkout can never be committed.
-quest-statusline.sh
-# writeAtomic temp files
-*.tmp[0-9]*
 
 # written by Claude Code each time it loads the mod (API types for the editor and tsc)
 .claude-plugin/types/

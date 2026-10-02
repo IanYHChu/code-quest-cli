@@ -1,22 +1,10 @@
-// code-quest:noscan  (this module is the single source of tunable numbers + output text)
-// Code Quest - the pure data layer: ALL balance knobs (DEFAULT_CONFIG), ALL player-facing text
-// (DEFAULT_STRINGS) and the helpers over them. No Node APIs, so it loads both under Node and
-// inside a Claude Code mod (which has no fs, os or crypto). CONFIG and STR start as the sanitized
-// defaults; a host that can read the user's override files (quest-data.mjs under Node) overlays
-// them in place with applyOverrides() before the first scan, so every importer sees one object.
-// --- tunable balance knobs ------------------------------------------------------------------
-export const DEFAULT_CONFIG = {
-  hero: {
-    startLp: 20,                 // fresh hero LP
-    maxLevel: 99,                // level clamp
-    lpBase: 20,                  // maxHP = lpBase + (lv-1)*lpPerLevel + hpbonus
-    lpPerLevel: 2,
-    hpRelicBonus: 5,             // +HP relic raises the cap by this much
-    mitigationLevelDivisor: 25,  // every N levels shrugs off 1 more chip damage
-    // relative drop odds per relic kind. revive is a consumable that auto-saves you from a boss
-    // defeat (full heal, keep fighting); it is rarer than the permanent stat relics.
-    relicWeights: { atk: 3, def: 3, hp: 3, revive: 2 },
-  },
+// code-quest:noscan  (this module is the scanner's numbers + the report text)
+// Code Quest - the pure data layer the scanner (quest-analyze.mjs, quest-rules.mjs) and the
+// /cq-nudge report read: their tunable numbers (CONFIG), the smell, CWE and rule names with
+// their fix tips, and the nudge report's text (STR). No Node APIs: it loads inside the mod.
+// The game's own numbers live in hooks/game.ts and its content in data/.
+// --- tunable scanner knobs ------------------------------------------------------------------
+export const CONFIG = {
   lane: {
     min: 6, max: 18,             // base floor length range (from file size)
     base: 9,                     // fallback length when a profile has none
@@ -49,71 +37,7 @@ export const DEFAULT_CONFIG = {
     proseInjPowerBase: 3, proseInjPowerMax: 5,
   },
   power: { min: 1, max: 5, severityDivisor: 2, depthDivisor: 3 }, // floor power grading
-  track: {
-    secretsCap: 2,               // at most this many $ per floor
-    trapFactor: 0.5, boonFactor: 0.5, // density -> count scaling
-    baseBoonChance: 45,          // % chance even a neutral floor seeds one boon
-    exitMinFromStart: 3,         // the * never sits right at the entrance
-  },
-  ambush: {
-    baseAggro: 20, maxAggro: 80, // clean ~20%; debt widens, taming shrinks
-    pincerThreshold: 20, rearThreshold: 70, // kind-of-ambush roll bands (0-99)
-    backDmg: 2, frontDmg: 1,     // small fixed chips, reduced by mitigation
-    tamingCap: 40, tamingStep: 1, // a slain boss tames the dungeon
-  },
-  hazard: {
-    leakMultiplier: 2,           // $ leak bites power*leakMultiplier
-    boonHeal: 2,                 // + tile heal
-    boonRelicChance: 8,          // % chance a + tile also forges a relic
-  },
-  boss: {
-    // The fight is a multi-round HP duel, not a single check. Boss HP exceeds your maxlp, and you
-    // trade blows each round until one side drops. Your per-round damage scales with level + ATK +
-    // buff + the diff's virtue; the boss's per-round damage scales with your maxlp so it stays a real
-    // threat at every level. Preparation (buff from tests, relics, a clean+virtuous diff) wins fast
-    // and nearly unscathed; a naked or dirty commit drags it out and can get you defeated.
-    hpMult: 1.25, hpPowerMult: 5, hpSmellMult: 4,        // boss HP = round(maxlp*hpMult) + power/smell bonus
-    atkLvMult: 0.5, atkBuffMult: 5,                      // your dmg/round = round(lv*atkLvMult) + ATK*buff*atkBuffMult + virtue + d{diceSides}
-    bossDmgFrac: 0.11, bossDmgPowerMult: 2, bossDmgSmellMult: 1.5, // boss dmg/round = round(maxlp*bossDmgFrac + power/smell) - mitigation
-    diceSides: 6, maxRounds: 5,  // the whole fight is shown in ONE status-line frame, so keep it short
-    sparkBlocks: '▁▂▃▄▅▆▇█',     // HP-bar glyphs (low→high) for the per-round sparklines
-    loseReviveFrac: 0.34,        // a defeat leaves you limping at this fraction of maxlp (no free full revive)
-    holdMs: 12000,               // the status line keeps showing the fight result for this long (so a
-                                 // follow-up command like `git log` can't bury it before a redraw lands)
-    // a +2 Lv "big boss" is a genuinely nasty fight: a dirty diff OR a high-power (debt-ridden) dungeon
-    bigBossSmells: 3, bigBossPower: 4, bigBossLvUp: 2, normalLvUp: 1,
-    dropChance: 35,              // % loot drop on a kill
-    freshCommitSecs: 300,        // HEAD's committer time must be this fresh — a commit rejected by a
-                                 // pre-commit hook leaves HEAD old, and an old HEAD is no boss
-  },
-  test: { failDamage: 3, passHeal: 3 },
-  buff: { testCap: 6, max: 9, bossReset: 1 },
-  // The Penitent Engine (a Warhammer 40K nod): a save whose signature fails to verify, or whose
-  // level is impossible given its lifetime ledger, is locked into the engine — LP drains every
-  // move while ATK is boosted (pure offense, no protection, true to the source) — until DEATH
-  // releases it (the normal revive applies, the mark is lifted). Penance is paid in blood, not
-  // erased. This is tamper-EVIDENCE with an in-fiction consequence, not anti-cheat (only a server
-  // could be that).
-  tamper: {
-    penitentDrain: 1,            // LP lost on every move while penitent
-    penitentStatMult: 1.1,       // effective ATK multiplier while penitent (+10%); DEF is untouched
-  },
-  prompt: {
-    minLen: 12,                  // shorter than this fizzles
-    scoreLenMin: 40, scoreLenMax: 1200, // a well-sized prompt earns a point
-    healMin: 2, healMax: 5,      // good prompt = in-dungeon heal
-    healScoreThreshold: 2,       // need this score to heal at all
-    strikeScoreThreshold: 3,     // need this score to also clear a hazard ahead
-    sentenceCount: 2,            // 2+ sentence-enders earns a point
-  },
-  vigil: {
-    minMinutes: 1,               // a tool running this long fills the idle window
-    perMinutes: 3,               // ~every N minutes = +1 buff
-    buffCap: 4,                  // max buff from a single vigil
-    relicMinutes: 12,            // a very long vigil forges a relic
-  },
-  store: { findingsCap: 300, pendingPruneMinutes: 30, stdinMaxMB: 8 }, // hook-payload size cap (oversized = skip the scan, never OOM)
-  // /cq-nudge — the commit-nudge report (quest-nudge.mjs): how many of YOUR recent commits to
+  // /cq-nudge — the commit-nudge report (hooks/nudge.ts): how many of YOUR recent commits to
   // re-scan, and output caps so a giant diff can't flood the terminal or stall the command.
   nudge: {
     commits: 5,                  // default number of recent commits to review (/cq-nudge N overrides)
@@ -121,81 +45,19 @@ export const DEFAULT_CONFIG = {
     maxPerCommit: 40,            // findings shown per commit before truncating
     maxLinesPerFile: 4000,       // added lines scanned per file per commit (latency guard)
     snippetLen: 100,             // max chars of the offending line echoed in the report
-    maxDiffMB: 8,                // git show buffer cap
   },
   // files whose BASENAME matches one of these globs are never scanned for smells — robust even on a
   // partial (offset) read, unlike the in-content `code-quest:noscan` sentinel (which still works too).
-  // The default exempts ONLY the rule catalog (these two files are made of trigger literals — the
-  // scanner-scans-scanner trap); the rest of Code Quest's runtime is scanned like any other code and
-  // is kept clean enough to pass its own scan (see test/dogfood.test.mjs). Add your own globs for
-  // generated/vendored files — but avoid generic names, a bare basename matches in EVERY repo.
-  scan: { noscanFiles: ['quest-rules.mjs', 'quest-data.mjs'] },
+  // The default exempts ONLY the rule catalog and its text (these two files are made of trigger
+  // literals — the scanner-scans-scanner trap); the rest of Code Quest is scanned like any other
+  // code. Avoid generic names here: a bare basename matches in EVERY repo.
+  scan: { noscanFiles: ['quest-rules.mjs', 'quest-config.mjs'] },
 };
 
 // --- all player-facing text (templates use {name} placeholders, expanded by fmt()) ----------
-export const DEFAULT_STRINGS = {
-  events: {
-    enterDungeon: 'enter the dungeon',
-    floorClear: 'floor clear! Lv{lv}',
-    trap: 'trap! -{dmg}',
-    leak: 'LEAK! -{dmg}',
-    loot: 'found loot +{n}',
-    pincer: 'pincer! -{dmg}',
-    ambushBack: 'ambushed! -{dmg}',
-    ambushFront: 'struck ahead -{dmg}',
-    fell: 'you fell! revived',
-    commitSealed: 'commit sealed',
-    testsFail: 'tests fail -{dmg}',
-    testsPass: 'tests pass buff x{buff}',
-    castClears: 'cast! +{heal} clears',
-    castFocus: 'focus cast +{heal}',
-    weakCast: 'weak cast',
-    mumble: 'mumble... no effect',
-    forbidden: '~forbidden magic~',
-    taintedDoc: 'TAINTED DOC! injection',
-    vigilBuff: 'vigil +{n} buff',
-    penitent: 'PENITENT ENGINE!',
-    penanceDone: 'penance complete',
-  },
-  relics: { atk: '+ATK relic!', def: '+DEF relic!', hp: '+HP relic!', phoenix: '+REVIVE relic!' },
-  // git commit = a multi-round boss fight, rendered as one self-contained status-line frame.
-  boss: {
-    // the whole git-commit fight renders as ONE status-line frame:
-    //   <red boss-HP sparkline> <yellow your-HP sparkline> <outcome>
-    win: '+{lv}Lv',                  // outcome label: you slew the boss
-    defeat: 'DEFEAT',                // outcome label: you fell
-    revive: 'REVIVE',                // outcome label: a revive relic saved you, fight ended
-  },
-  // varies the "nothing happened" line so a quiet stretch still feels alive
-  flavor: ['exploring…', 'quiet halls', 'press on', 'all clear', 'scouting', 'onward', 'dust and echoes', 'a calm stretch'],
-  statusline: { label: 'CQ:Lv', defaultEvent: 'ready', penitentMark: '✠' },
-  reroll: { done: 'Code Quest: rerolled. Hero back to Lv01, all dungeons reset.' },
+export const STR = {
   report: {
-    title: 'Code Quest - Dungeon Report',
-    subtitle: 'why your code became a dungeon',
-    characterLabel: 'Character',
-    relicsLabel: 'relics',
-    revivesLabel: 'revives',
-    relicsNone: 'none',
-    lastBattleTitle: 'Last battle',
-    lastBattleNote: '(your most recent git commit boss fight)',
-    lineageVerified: 'save lineage: verified',
-    lineagePenitent: 'save lineage: PENITENT ENGINE - LP -{drain} every move, ATK +{pct}%, released only by death',
-    scanned: 'Scanned {n} file(s) that made the dungeon harder.',
-    noSmells: 'No smells logged yet. Read a few files in Claude Code, then run this again.',
-    sections: {
-      inj: 'PROMPT INJECTION  (a doc tried to hijack the agent reading it)',
-      leak: '$ CREDENTIAL LEAKS  (deadliest - spawn red $ hazards)',
-      sin: 'SECURITY SINS  (+power: stronger traps & ambushes)',
-      cwe: 'CWE WEAKNESSES  (mapped to MITRE CWE - distinct weaknesses found across your reads)',
-      codeSmells: 'CODE SMELLS  (mapped to ESLint / SonarQube - maintainability & portability)',
-      ambush: 'AMBUSHES  (raise the rate enemies strike from front/behind)',
-      trap: 'TRAPS  (more # on the floor)',
-      nesting: 'DEEP NESTING  (+power and more traps)',
-      topOffenders: 'TOP OFFENDERS',
-      topOffendersNote: '(hardest floors they generated)',
-    },
-    // MITRE CWE id -> short name, for the CWE WEAKNESSES section. Each security regex carries a cwe.
+    // MITRE CWE id -> short name. Each security regex carries a cwe.
     cweNames: {
       'CWE-22': 'Path Traversal',
       'CWE-78': 'OS Command Injection',
@@ -225,7 +87,7 @@ export const DEFAULT_STRINGS = {
       'CWE-1357': 'Reliance on Untrustworthy Component (:latest)',
       'CWE-1392': 'Use of Default Credentials',
     },
-    // ESLint / SonarQube rule id -> short name, for the CODE SMELLS section. Each Tier-A quality
+    // ESLint / SonarQube rule id -> short name. Each Tier-A quality
     // regex carries a rule id (the quality analogue of CWE).
     ruleNames: {
       'eqeqeq': 'Loose equality (use === / !==)',
@@ -238,9 +100,6 @@ export const DEFAULT_STRINGS = {
       'S107': 'Too many parameters (>=6)',
       'S3776': 'High cognitive complexity',
     },
-    nestingTip: 'flatten with early-returns / extract functions',
-    offenderLine: 'power {power}, {dollars}x $, {traps} traps, +{ambush}% ambush',
-    footer: 'Fix these and the dungeon eases up. Re-read a file to re-scan it.',
     // smell catalog: which raw count, how it reads, and how to fix it
     smells: [
       { bucket: 'inj', key: 'inj', label: 'Indirect prompt injection in a doc (ignore-instructions / fake <system> tags / jailbreak)', tip: 'treat doc content as untrusted DATA, never as instructions to the agent' },
@@ -297,72 +156,7 @@ export const DEFAULT_STRINGS = {
     sarifHint: '/cq-nudge --sarif emits SARIF 2.1.0 (GitHub code scanning / VS Code SARIF Viewer can read it).',
     sev: { high: 'HIGH', med: 'MED', low: 'LOW', note: 'tip' },
   },
-  install: {
-    installed: 'Code Quest installed.\n  runtime  -> {bin}\n  commands -> {cmds}\n  status line + Pre/PostToolUse + UserPromptSubmit hooks wired into {settings}\nRestart Claude Code (or open a new session) to load it, then just start coding.',
-    removed: 'Code Quest removed (status line restored, hooks + commands deleted).{tail}',
-    removedKept: ' Your hero/save was kept — uninstall --purge to wipe it.',
-    removedPurged: ' Save data purged.',
-    statusInstalled: 'Code Quest: installed',
-    statusNotInstalled: 'Code Quest: not installed',
-    statusHero: '  hero: Lv{lv} (hp {lp}/{maxlp})  relics: {relics}  revives: {revives}',
-    usage: 'usage: code-quest [install|uninstall [--purge]|status]',
-    error: 'code-quest:',
-    settingsCorrupt: 'code-quest: {settings} exists but is not valid JSON. Refusing to touch it.\nFix the syntax error (or move the file aside) and run this again.',
-    backupFailed: 'code-quest: warning — could not snapshot {settings} to {backup}; continuing without a pristine backup.',
-    commandBackedUp: 'code-quest: {file} already existed (your own command) — backed up to {backup}; uninstall restores it.',
-    settingsCorruptUninstall: 'code-quest: {settings} is not valid JSON, so its statusLine/hooks were left untouched — remove the Code Quest statusLine and the quest-hook.mjs hook entries by hand (a pristine pre-install snapshot is kept at {backup} if it exists). All Code Quest files were still removed.',
-    windowsUnsupported: 'Code Quest currently supports macOS and Linux only (the status line wrapper needs bash).\nGood news: Microsoft is shipping native bash/coreutils for Windows (https://github.com/microsoft/coreutils),\nso native support should become possible soon. Until then, install inside WSL.',
-  },
 };
-
-// --- ANSI palette (shared so colors are defined once, not per script) -----------------------
-export const ANSI = {
-  reset: '\x1b[0m', bold: '\x1b[1m', dim: '\x1b[2m',
-  red: '\x1b[91m', g: '\x1b[92m', y: '\x1b[93m', mag: '\x1b[95m', cy: '\x1b[96m',
-};
-// event-kind key -> color (the evk field on saved state)
-export const EVK_COLOR = { red: ANSI.red, cy: ANSI.cy, g: ANSI.g, mag: ANSI.mag, y: ANSI.y, dim: ANSI.dim };
-
-// --- overlay: defaults merged with optional user overrides, type-guarded --------------------
-const isObj = (x) => x && typeof x === 'object' && !Array.isArray(x);
-export function deepMerge(base, over) {
-  if (!isObj(over)) return base;
-  const out = isObj(base) ? { ...base } : {};
-  for (const k of Object.keys(over)) {
-    out[k] = isObj(base[k]) && isObj(over[k]) ? deepMerge(base[k], over[k]) : over[k];
-  }
-  return out;
-}
-// Type-guard a merged overlay (config OR strings) against its defaults: a user override of the
-// wrong type (a string where a number belongs, a scalar where an array belongs) silently falls
-// back to the default instead of crashing the hook at import time or producing NaN balance math.
-// The defaults are the schema — only keys they define are checked; extra user keys pass through.
-export function sanitizeConfig(merged, defaults) {
-  if (!isObj(defaults)) return merged;
-  const out = isObj(merged) ? { ...merged } : {};
-  for (const k of Object.keys(defaults)) {
-    const dv = defaults[k], mv = out[k];
-    if (typeof dv === 'number') { const n = Number(mv); out[k] = Number.isFinite(n) ? n : dv; }
-    else if (typeof dv === 'string') out[k] = typeof mv === 'string' ? mv : dv;
-    else if (Array.isArray(dv)) out[k] = Array.isArray(mv) ? mv : dv;
-    else if (isObj(dv)) out[k] = sanitizeConfig(isObj(mv) ? mv : {}, dv);
-  }
-  return out;
-}
-
-export const CONFIG = sanitizeConfig(structuredClone(DEFAULT_CONFIG), DEFAULT_CONFIG);
-export const STR = sanitizeConfig(structuredClone(DEFAULT_STRINGS), DEFAULT_STRINGS);
-
-// Overlay user overrides onto CONFIG / STR in place (the objects stay the same, so modules that
-// imported them earlier see the change). Wrong-typed values fall back to the defaults.
-export function applyOverrides({ config, strings } = {}) {
-  const swap = (target, next) => {
-    for (const k of Object.keys(target)) delete target[k];
-    Object.assign(target, next);
-  };
-  if (config) swap(CONFIG, sanitizeConfig(deepMerge(DEFAULT_CONFIG, config), DEFAULT_CONFIG));
-  if (strings) swap(STR, sanitizeConfig(deepMerge(DEFAULT_STRINGS, strings), DEFAULT_STRINGS));
-}
 
 // {name} template expansion. Missing vars are left as-is so a typo is visible, never crashes.
 export function fmt(tpl, vars = {}) {
@@ -375,16 +169,4 @@ export function fmt(tpl, vars = {}) {
 // (title spoofing, clear-screen, OSC 52 clipboard writes). Our own coloring is added AFTER this.
 export function stripCtl(s) {
   return String(s ?? '').replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, '');
-}
-
-// the one true maxHP formula (was duplicated across hook / status / report / cli)
-export function maxlpFor(hero) {
-  const lv = Math.max(1, Math.min(CONFIG.hero.maxLevel, hero.lv | 0));
-  return CONFIG.hero.lpBase + (lv - 1) * CONFIG.hero.lpPerLevel + (hero.hpbonus || 0);
-}
-
-// render a series of values (0..max) as a sparkline of block glyphs — the boss/your HP bars
-export function sparkline(vals, max) {
-  const b = CONFIG.boss.sparkBlocks, m = max > 0 ? max : 1, hi = b.length - 1;
-  return (vals || []).map(v => b[Math.max(0, Math.min(hi, Math.round((v / m) * hi)))]).join('');
 }
