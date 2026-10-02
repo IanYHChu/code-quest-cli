@@ -5,3 +5,6 @@ node_modules/
 quest-statusline.sh
 # writeAtomic temp files
 *.tmp[0-9]*
+
+# written by Claude Code each time it loads the mod (API types for the editor and tsc)
+.claude-plugin/types/

@@ -1,0 +1,8 @@
+{
+  "name": "code-quest",
+  "version": "0.2.0",
+  "description": "An ambient gear-driven roguelike in the band above your prompt: your code's smells breed the monsters, Claude's work drives the run.",
+  "author": { "name": "Ian Chu", "url": "https://github.com/IanYHChu" },
+  "license": "MIT",
+  "types": "./types/index.d.ts"
+}
