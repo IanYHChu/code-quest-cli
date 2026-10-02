@@ -4,7 +4,7 @@
 // floor generation; the nudge re-uses the very same patterns for a line-attributed pass over
 // your commit diffs (scanDetail). Security rules carry a severity (0-9, CVSS-ish) + a MITRE CWE
 // id; quality rules carry a canonical ESLint/SonarQube/clippy/PMD rule id.
-import { CONFIG } from './quest-data.mjs';
+import { CONFIG } from './quest-config.mjs';
 
 const clamp = (lo, hi, n) => Math.max(lo, Math.min(hi, n));
 
@@ -72,12 +72,17 @@ export const CONTAINER_PATS = [
   { re: /^\s*USER\s+root\b/im, sev: 6, cwe: 'CWE-250' },                               // dockerfile runs as root
 ];
 export const RE_DEBT = /\b(TODO|FIXME|HACK|XXX)\b|@ts-ignore|@SuppressWarnings|#\s*type:\s*ignore|#\s*noqa|\/\/\s*nolint|#\[allow\(/; // tech-debt + warning-suppression markers (ts/java/py/go/rust)
-// bare magic numbers. magicDigits is clamped + the build is guarded: a bad user config value must
-// never throw at import time (that would error the hook on every tool call).
-let _magic;
-try { _magic = new RegExp('[^.\\w]\\d{' + clamp(2, 9, CONFIG.analyze.magicDigits | 0) + ',}\\b'); }
-catch { _magic = /[^.\w]\d{4,}\b/; }
-export const RE_MAGIC = _magic;
+// bare magic numbers. Built on first use, not at import, so a user override applied after this
+// module loaded still counts; magicDigits is clamped + the build is guarded: a bad config value
+// must never throw (that would error every scan).
+let _magic, _magicDigits;
+export function magicRe() {
+  const d = clamp(2, 9, CONFIG.analyze.magicDigits | 0);
+  if (_magic && d === _magicDigits) return _magic;
+  try { _magic = new RegExp('[^.\\w]\\d{' + d + ',}\\b'); } catch { _magic = /[^.\w]\d{4,}\b/; }
+  _magicDigits = d;
+  return _magic;
+}
 export const RE_DEAD = /^\s*(\/\/|#)\s*(if|for|while|return|function|def|class|const|let|var)\b/; // commented-out code
 export const RE_DEBUG = /console\.(log|debug)|(^|[^\w.])print\(|\bdebugger\b|var_dump|System\.out\.print|fmt\.Print|\bdd\(/; // debug leftovers
 export const RE_SWALLOW_LINE = /except[^\n:]*:\s*pass|except\s*:/;         // swallowed exception (python)
@@ -155,10 +160,19 @@ export const PROSE_RE = /\.(md|markdown|mdx|txt|rst|adoc|org)$/i;
 
 // a file's BASENAME can opt out of scanning (config: scan.noscanFiles globs). Filename-based works
 // even on a partial/offset read, unlike the in-content sentinel below (which a slice can miss).
-const NOSCAN_RE = (CONFIG.scan.noscanFiles || []).map(g =>
-  new RegExp('^' + String(g).replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$'));
+// Built on first use (and rebuilt if the globs change), for the same reason as magicRe().
+let _noscan = [], _noscanKey = null;
+function noscanRes() {
+  const globs = CONFIG.scan.noscanFiles || [];
+  const key = globs.join('\0');
+  if (key !== _noscanKey) {
+    _noscan = globs.map(g => new RegExp('^' + String(g).replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$'));
+    _noscanKey = key;
+  }
+  return _noscan;
+}
 export const baseName = (p) => String(p || '').split(/[\\/]/).pop();
-export const noscanByName = (p) => { const b = baseName(p); return NOSCAN_RE.some(re => re.test(b)); };
+export const noscanByName = (p) => { const b = baseName(p); return noscanRes().some(re => re.test(b)); };
 
 // ---------------------------------------------------------------------------------------------
 // scanDetail — the nudge report's line-attributed pass (NOT used by the game's hot path).
@@ -178,7 +192,7 @@ const SECURITY_LISTS = [
 ];
 const SMELL_LINE_RULES = [
   { key: 'todos', re: RE_DEBT },
-  { key: 'magic', re: RE_MAGIC },
+  { key: 'magic', get re() { return magicRe(); } }, // lazy: see magicRe()
   { key: 'dead', re: RE_DEAD },
   { key: 'debug', re: RE_DEBUG },
   { key: 'swallow', re: RE_SWALLOW_LINE },

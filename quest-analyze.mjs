@@ -3,10 +3,10 @@
 // CWE ids, severities, linter rule ids) lives in quest-rules.mjs; this module only wires those
 // patterns to counts, so unlike the catalog it carries no trigger strings of its own — it is
 // scanned like any other file. All balance numbers come from CONFIG (quest-data.mjs).
-import { CONFIG } from './quest-data.mjs';
+import { CONFIG } from './quest-config.mjs';
 import {
   SECRET_PATS, WEAKCRED_PATS, INSECURE_PATS, MISCONFIG_PATS, CONTAINER_PATS,
-  RE_DEBT, RE_MAGIC, RE_DEAD, RE_DEBUG, RE_SWALLOW_LINE, RE_SWALLOW_BLOCK,
+  RE_DEBT, magicRe, RE_DEAD, RE_DEBUG, RE_SWALLOW_LINE, RE_SWALLOW_BLOCK,
   VIRTUE_PATS, QUALITY_PATS, complexityCount, langTags, gateOk,
   injCount, noscanByName,
 } from './quest-rules.mjs';
@@ -59,7 +59,7 @@ export function analyze(content = '', totalLines = 0, isProse = false, path = ''
     if (line.length > A.longLineLen) longLines++;
     if (line.length > A.scanMaxLineLen) continue;            // minified guard: monster lines skip pattern scans
     if (RE_DEBT.test(line)) todos++;
-    if (RE_MAGIC.test(line)) magic++;
+    if (magicRe().test(line)) magic++;
     if (RE_DEAD.test(line)) dead++;
     if (RE_DEBUG.test(line)) debug++;
     if (RE_SWALLOW_LINE.test(line)) swallow++;

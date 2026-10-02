@@ -171,7 +171,7 @@ function install() {
   writeJson(SETTINGS, settings);
 
   for (const c of COMMANDS) {
-    const tpl = readFileSync(join(PKG, 'commands', c), 'utf8').replaceAll('__CQ_BIN__', BIN);
+    const tpl = readFileSync(join(PKG, 'legacy-commands', c), 'utf8').replaceAll('__CQ_BIN__', BIN);
     const dest = join(CMDDIR, c);
     // a pre-existing command file that isn't ours (no CMD_MARKER) is the USER's own command:
     // snapshot it once beside itself so uninstall can put it back, never silently clobber it.

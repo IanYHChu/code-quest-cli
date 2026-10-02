@@ -62,3 +62,14 @@ test('sparkline maps values onto the glyph ramp', () => {
   assert.equal(line[0], b[0]);
   assert.equal(line[2], b[b.length - 1]);
 });
+
+test('applyOverrides overlays CONFIG in place and type-guards it', async () => {
+  const { CONFIG: C, applyOverrides, DEFAULT_CONFIG: D } = await import('../quest-config.mjs');
+  const before = C;
+  applyOverrides({ config: { lane: { min: 'nope' }, analyze: { magicDigits: 5 } } });
+  assert.equal(C, before, 'same object, so earlier importers see the change');
+  assert.equal(C.lane.min, D.lane.min, 'wrong-typed value falls back to the default');
+  assert.equal(C.analyze.magicDigits, 5);
+  applyOverrides({ config: {} });
+  assert.equal(C.analyze.magicDigits, D.analyze.magicDigits);
+});
