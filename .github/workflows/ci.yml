@@ -3,18 +3,25 @@ on:
   push:
     branches: [main]
   pull_request:
+permissions:
+  contents: read
 jobs:
   test:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        node: [18, 22]
+        node: [22, 24]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ matrix.node }}
+      # `npm test` runs `claude plugin test`, which needs Claude Code (Node 22+) on the runner
+      - run: npm install -g @anthropic-ai/claude-code@2.1.289
+      - run: npm run validate
       - run: npm test
       # eyeball guard on the published tarball: runtime + commands only, never local state
       - run: npm pack --dry-run

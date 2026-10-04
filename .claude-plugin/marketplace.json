@@ -5,7 +5,7 @@
     {
       "name": "code-quest",
       "description": "A gear-driven roguelike in the band above your prompt: your code's smells breed the monsters, Claude's work drives the run.",
-      "source": { "source": "npm", "package": "code-quest-cli" }
+      "source": { "source": "npm", "package": "code-quest-cli", "version": "0.2.0" }
     }
   ]
 }

@@ -1,6 +1,9 @@
 <!-- code-quest:noscan (this doc quotes the smell patterns; don't let the scanner flag it) -->
 # Code Quest
 
+[![ci](https://github.com/IanYHChu/code-quest-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/IanYHChu/code-quest-cli/actions/workflows/ci.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/IanYHChu/code-quest-cli/badge)](https://scorecard.dev/viewer/?uri=github.com/IanYHChu/code-quest-cli)
+
 A gear-driven roguelike that plays itself in a three-row band above your Claude Code prompt while
 you work. Claude's tool calls drive the run, and **the monsters are bred from your code's smells**:
 every file Claude reads is scanned, and what the scanner finds is what steps out to fight you.
@@ -189,6 +192,22 @@ several sessions open at once, the last one to change the run wins.
 Code already hands it (tool calls and their results), and keeps only the run: your gear, bag and
 LP, and the smell counts and path of the file Claude last read.
 
+**What the mod can do.** Claude Code mods are not sandboxed, so here is the full list. The mod
+imports nothing but the Mods API and its own files, and touches no Node globals (`process`,
+`fetch`, `require`, ...), so everything it does goes through the calls that
+`claude plugin validate .` lists:
+
+- `tool.call`: it waits for each tool call to finish, reads the input and result to move the run,
+  and passes the result back unchanged. It never rewrites or denies a call.
+- `$.process.run`: only `/cq-nudge` uses it, to run `git` on your own recent commits. The first
+  argument is always `git`, and revisions are checked against a strict charset so an argument
+  can't smuggle in an option.
+- Everything else is drawing the band and pane, the slash commands, a timer, and saving the run.
+
+The [claude-mods-games](https://github.com/IanYHChu/claude-mods-games) marketplace checks each
+pinned release of this package against that list, and publishes the result in its
+[CAPABILITIES.md](https://github.com/IanYHChu/claude-mods-games/blob/main/CAPABILITIES.md).
+
 ## Making it your own
 
 The game's content is data, not logic, so adding to it is editing a table:
@@ -209,8 +228,12 @@ claude plugin validate .   # what the module hooks and calls, and what the engin
 claude plugin test .       # the hooks/*.test.ts suite, run against the engine itself
 ```
 
-A release bumps the version in both `package.json` and `.claude-plugin/plugin.json`, then
-`npm publish` (the `prepublishOnly` script runs validation and the tests first).
+A release bumps the version in `package.json`, `.claude-plugin/plugin.json` and the pinned
+`version` in `.claude-plugin/marketplace.json`, then pushes a `vX.Y.Z` tag. The `publish` workflow
+checks the tag against the versions, runs validation and the tests, and stages the release on npm
+through trusted publishing. A staged release goes live only after a maintainer approves it with
+2FA on npmjs.com, and every release carries an npm provenance attestation that links the tarball
+to the commit and workflow that built it. Nothing is published from a laptop.
 
 ## Credits
 
