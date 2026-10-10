@@ -12,15 +12,19 @@ const BAND = {
 } as const
 const START = { cwd: '/repo', surface: 'terminal', isInteractive: true } as const
 
-// the engine beneath a session start: a clock, the command table, and a store that records
-// what the plugin keeps
+// the engine beneath a session start: a clock, the command table, a store that records what the
+// plugin keeps, and a log that takes its lines
 function boot(on: On, saved?: unknown): { store: Map<string, unknown> } {
   const store = new Map<string, unknown>(saved === undefined ? [] : [['game', saved]])
   mock.clock(on)
-  on('command.register', () => ({}) as never)
+  on('command.register', (_$, e) => ({ value: { command: e.name } }))
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
-  on('store.get', (_$, e) => ({ value: store.get(e.key) }) as never)
-  on('store.set', (_$, e) => { store.set(e.key, e.value); return {} as never })
+  on('store.get', (_$, e) => ({ value: store.get(e.key) }))
+  on('store.set', (_$, e) => {
+    store.set(e.key, e.value)
+    return { value: undefined }
+  })
+  on('ui.log', () => ({ value: undefined }))
   return { store }
 }
 

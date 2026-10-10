@@ -1,6 +1,7 @@
 {
   "name": "code-quest-cli",
   "owner": { "name": "Ian Chu", "url": "https://github.com/IanYHChu" },
+  "description": "code-quest, a gear-driven roguelike played above the Claude Code prompt.",
   "plugins": [
     {
       "name": "code-quest",

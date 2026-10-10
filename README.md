@@ -22,6 +22,13 @@ sent to the model. Only the slash commands put text in the transcript, and only 
 
 ## Install
 
+Requires Claude Code 2.1.290 or later. Mods shipped in 2.1.287, and the releases after it fixed what
+this game relies on: installed mods loading in the first session after an upgrade, the right-hand
+side of the band drawing under its `[-]`, and redraws stalling on long text in symbols or CJK. Check
+with `claude --version`, update with `claude update`. The stable release channel (and the
+`claude-code` Homebrew cask) is still on 2.1.287; switch to the latest channel in `/config` until it
+catches up.
+
 Inside Claude Code:
 
 ```

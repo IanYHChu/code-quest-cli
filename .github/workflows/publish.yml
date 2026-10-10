@@ -22,7 +22,7 @@ jobs:
       # `npm stage` needs npm 11.15.0+
       - run: npm install -g npm@11.21.0
       # prepublishOnly runs `claude plugin validate` and `claude plugin test`
-      - run: npm install -g @anthropic-ai/claude-code@2.1.289
+      - run: npm install -g @anthropic-ai/claude-code@2.1.296
       - name: tag matches the versions
         run: |
           v="${GITHUB_REF_NAME#v}"
